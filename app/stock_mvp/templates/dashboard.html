@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 
+<!-- Scan Progress Banner (polls /api/scan/status) -->
+<div id="scan-banner" style="display:none;" class="scan-progress-banner">
+  <div class="scan-progress-inner">
+    <div class="scan-spinner"></div>
+    <div class="scan-progress-text">
+      <div class="scan-phase" id="scan-message">Starting scan...</div>
+      <div class="scan-detail" id="scan-detail"></div>
+    </div>
+    <div class="scan-progress-bar-wrap">
+      <div class="scan-progress-bar" id="scan-bar" style="width: 0%"></div>
+    </div>
+    <span class="scan-pct" id="scan-pct">0%</span>
+  </div>
+</div>
+
 {% if run and run.summary %}
 <!-- KPI Row -->
 <div class="kpi-row">
@@ -240,14 +255,12 @@
 </div>
 
 {% else %}
-<!-- Empty State -->
+<!-- Empty State — initial scan is running in background -->
 <div class="card">
   <div class="empty-state">
-    <h3>No Scans Yet</h3>
-    <p>Run your first scan to discover opportunities in the Indian stock market.</p>
-    <form method="post" action="/runs/trigger">
-      <button type="submit" class="btn btn-primary">Run First Scan</button>
-    </form>
+    <h3>Setting Up</h3>
+    <p>Your first scan is running automatically in the background. This page will refresh when data is ready.</p>
+    <p class="meta">Fetching fundamentals for all stocks — this takes a few minutes on first run.</p>
   </div>
 </div>
 {% endif %}
@@ -264,6 +277,42 @@ function toggleMetrics(idx) {
     icon.innerHTML = '&#9662;';
   }
 }
+
+// Poll scan status
+(function() {
+  var banner = document.getElementById('scan-banner');
+  var msgEl = document.getElementById('scan-message');
+  var detailEl = document.getElementById('scan-detail');
+  var barEl = document.getElementById('scan-bar');
+  var pctEl = document.getElementById('scan-pct');
+  var wasRunning = false;
+
+  function poll() {
+    fetch('/api/scan/status')
+      .then(function(r) { return r.json(); })
+      .then(function(s) {
+        if (s.running) {
+          banner.style.display = 'block';
+          msgEl.textContent = s.message || 'Scanning...';
+          detailEl.textContent = s.symbol ? ('Current: ' + s.symbol) : '';
+          barEl.style.width = s.pct + '%';
+          pctEl.textContent = s.pct + '%';
+          wasRunning = true;
+        } else {
+          banner.style.display = 'none';
+          if (wasRunning) {
+            // Scan just finished — reload to show results
+            wasRunning = false;
+            window.location.reload();
+          }
+        }
+      })
+      .catch(function() {});
+  }
+
+  poll();
+  setInterval(poll, 2000);
+})();
 </script>
 
 {% endblock %}

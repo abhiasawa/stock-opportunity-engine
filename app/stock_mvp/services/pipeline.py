@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import threading
 from typing import Any
 
 from app.stock_mvp.core import db
@@ -8,11 +10,26 @@ from app.stock_mvp.models.schemas import StockSnapshot
 from app.stock_mvp.providers.base import DataProvider
 from app.stock_mvp.services.factories import build_provider
 from app.stock_mvp.services.scoring import ScoreEngine
+from app.stock_mvp.services import scan_status
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineService:
     def __init__(self, provider: DataProvider | None = None) -> None:
         self.provider = provider
+
+    def run_scan_background(self, run_type: str = "manual") -> None:
+        """Run scan in a background thread so the UI doesn't block."""
+        t = threading.Thread(target=self._run_scan_safe, args=(run_type,), daemon=True)
+        t.start()
+
+    def _run_scan_safe(self, run_type: str) -> None:
+        try:
+            self.run_scan(run_type=run_type)
+        except Exception as exc:
+            logger.error("Background scan failed: %s", exc)
+            scan_status.finish_scan(f"Scan failed: {exc}")
 
     def run_scan(self, run_type: str = "manual") -> dict[str, Any]:
         rules = load_rules()
@@ -22,9 +39,14 @@ class PipelineService:
 
         try:
             lookback_days = int(rules.get("data_provider", {}).get("events_lookback_days", 90))
+
+            scan_status.update_scan("fetching_data", 0, message="Loading stock data...")
             stocks = provider.get_stock_snapshots()
+
+            scan_status.update_scan("fetching_events", 0, message="Fetching corporate events...")
             events = provider.get_recent_events(lookback_days=lookback_days)
 
+            scan_status.update_scan("scoring", 0, message="Applying filters and scoring...")
             universe = self._apply_universe_filters(stocks, rules)
             passed = self._apply_quality_filters(universe, rules)
 
@@ -66,6 +88,7 @@ class PipelineService:
             }
 
             db.complete_run(run_id, summary)
+            scan_status.finish_scan(f"Done — {len(rec_rows)} recommendations from {len(stocks)} stocks")
 
             return {
                 "run": db.get_run(run_id),
@@ -74,6 +97,7 @@ class PipelineService:
 
         except Exception as exc:
             db.fail_run(run_id, str(exc))
+            scan_status.finish_scan(f"Scan failed: {exc}")
             raise
 
     def _apply_universe_filters(self, stocks: list[StockSnapshot], rules: dict[str, Any]) -> list[StockSnapshot]:

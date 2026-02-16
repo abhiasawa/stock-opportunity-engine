@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote as url_quote
@@ -15,9 +16,11 @@ from app.stock_mvp.core import db
 from app.stock_mvp.core.rules import RuleValidationError, load_rules, load_rules_raw, save_rules_raw
 from app.stock_mvp.core.settings import STATIC_DIR, TEMPLATE_DIR
 from app.stock_mvp.services.pipeline import PipelineService
+from app.stock_mvp.services import scan_status
 from app.stock_mvp.services.scheduler import reload_scheduler, start_scheduler, stop_scheduler
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 pipeline = PipelineService()
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
@@ -28,11 +31,18 @@ templates.env.filters["screener_encode"] = lambda s: url_quote(str(s), safe="")
 async def lifespan(_: FastAPI):
     db.init_db()
     start_scheduler(pipeline)
+
+    # Auto-trigger first scan if DB is empty
+    latest = db.get_latest_run()
+    if not latest:
+        logger.info("No scan data found — auto-triggering initial scan in background")
+        pipeline.run_scan_background(run_type="initial_auto")
+
     yield
     stop_scheduler()
 
 
-app = FastAPI(title="Stock Opportunity Engine", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="Stock Opportunity Engine", version="0.4.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -52,12 +62,14 @@ def health() -> dict[str, str]:
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
     payload = _latest_payload()
+    status = scan_status.get_scan_status()
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "run": payload["run"],
             "recommendations": payload["recommendations"],
+            "scan_status": status,
             "active_page": "dashboard",
         },
     )
@@ -65,8 +77,15 @@ def dashboard(request: Request):
 
 @app.post("/runs/trigger")
 def trigger_run_form() -> RedirectResponse:
-    pipeline.run_scan(run_type="manual")
+    status = scan_status.get_scan_status()
+    if not status["running"]:
+        pipeline.run_scan_background(run_type="manual")
     return RedirectResponse(url="/", status_code=303)
+
+
+@app.get("/api/scan/status")
+def api_scan_status() -> JSONResponse:
+    return JSONResponse(content=scan_status.get_scan_status())
 
 
 @app.get("/runs", response_class=HTMLResponse)
@@ -230,8 +249,11 @@ def api_recommendations_latest() -> JSONResponse:
 
 @app.post("/api/runs/trigger")
 def api_trigger_run() -> JSONResponse:
-    payload = pipeline.run_scan(run_type="manual_api")
-    return JSONResponse(content=payload)
+    status = scan_status.get_scan_status()
+    if status["running"]:
+        return JSONResponse(content={"ok": False, "message": "Scan already running"})
+    pipeline.run_scan_background(run_type="manual_api")
+    return JSONResponse(content={"ok": True, "message": "Scan started"})
 
 
 @app.get("/api/runs/{run_id}")

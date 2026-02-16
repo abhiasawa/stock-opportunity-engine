@@ -10,7 +10,7 @@ data_provider:
 
 universe:
   min_market_cap_cr: 50
-  max_market_cap_cr: 9999999  # No upper cap restriction
+  max_market_cap_cr: 50000  # Small + Mid cap focus (up to ~50k Cr)
   exchanges:
     - NSE
     - BSE

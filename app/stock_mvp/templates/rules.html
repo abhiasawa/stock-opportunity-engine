@@ -2,7 +2,7 @@
 {% block content %}
 
 {% if saved %}
-<div class="alert alert-success">Rules saved and scheduler reloaded successfully.</div>
+<div class="alert alert-success">Rules saved and scheduler reloaded.</div>
 {% endif %}
 {% if error %}
 <div class="alert alert-error">{{ error }}</div>
@@ -10,141 +10,105 @@
 
 <div class="card">
   <div class="card-header">
-    <h2>Rule Configuration</h2>
-    <div style="display: flex; gap: 8px;">
-      <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('yaml-mode').style.display = document.getElementById('yaml-mode').style.display === 'none' ? 'block' : 'none'; document.getElementById('visual-mode').style.display = document.getElementById('visual-mode').style.display === 'none' ? 'block' : 'none'; this.textContent = this.textContent === 'Raw YAML' ? 'Visual Editor' : 'Raw YAML';">Raw YAML</button>
-    </div>
+    <h2>Settings</h2>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="
+      var v = document.getElementById('visual-mode');
+      var y = document.getElementById('yaml-mode');
+      v.style.display = v.style.display === 'none' ? 'block' : 'none';
+      y.style.display = y.style.display === 'none' ? 'block' : 'none';
+      this.textContent = this.textContent === 'Raw YAML' ? 'Visual Editor' : 'Raw YAML';
+    ">Raw YAML</button>
   </div>
 
-  <!-- Visual Editor Mode -->
+  <!-- Visual Editor -->
   <div id="visual-mode">
     <div class="rule-tabs">
-      <button type="button" class="rule-tab active" onclick="switchTab(this, 'tab-provider')">Data Source</button>
-      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-universe')">Universe</button>
-      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-filters')">Filters</button>
-      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-weights')">Scoring Weights</button>
-      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-events')">Event Weights</button>
-      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-schedule')">Schedule</button>
+      <button type="button" class="rule-tab active" onclick="switchTab(this, 'tab-screening')">Screening Rules</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-scoring')">Scoring</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-advanced')">Advanced</button>
     </div>
 
     <form method="post" action="/rules/visual" id="visual-form">
 
-      <!-- Data Source Tab -->
-      <div id="tab-provider" class="rule-section active">
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Data Provider</label>
-            <select name="provider_type" class="form-select">
-              <option value="mock" {% if rules.data_provider.type == "mock" %}selected{% endif %}>Mock (Sample Data)</option>
-              <option value="india_live" {% if rules.data_provider.type == "india_live" %}selected{% endif %}>India Live (Yahoo Finance)</option>
-            </select>
-            <div class="form-hint">Use "Mock" for testing, "India Live" for real market data</div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Max Symbols to Scan</label>
-            <input type="number" name="max_symbols" class="form-input" value="{{ rules.data_provider.max_symbols }}" min="1" max="1000">
-            <div class="form-hint">Limit how many stocks are fetched per scan</div>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Request Timeout (sec)</label>
-            <input type="number" name="requests_timeout_sec" class="form-input" value="{{ rules.data_provider.requests_timeout_sec }}" min="5" max="60">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Events Lookback (days)</label>
-            <input type="number" name="events_lookback_days" class="form-input" value="{{ rules.data_provider.events_lookback_days }}" min="7" max="365">
-          </div>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">NSE Events Enabled</div>
-            <div class="toggle-desc">Fetch corporate announcements from NSE</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" name="nse_events_enabled" {% if rules.data_provider.nse_events_enabled %}checked{% endif %}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Universe Tab -->
-      <div id="tab-universe" class="rule-section">
+      <!-- Tab 1: Screening Rules -->
+      <div id="tab-screening" class="rule-section active">
+        <h3 style="margin: 0 0 16px; font-size: 14px; color: var(--ink);">Market Cap Range</h3>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Min Market Cap (Cr)</label>
             <input type="number" name="min_market_cap_cr" class="form-input" value="{{ rules.universe.min_market_cap_cr }}" min="0">
-            <div class="form-hint">Exclude stocks below this market cap</div>
+            <div class="form-hint">Micro-cap: 50+, Small-cap: 500+</div>
           </div>
           <div class="form-group">
             <label class="form-label">Max Market Cap (Cr)</label>
             <input type="number" name="max_market_cap_cr" class="form-input" value="{{ rules.universe.max_market_cap_cr }}" min="0">
-            <div class="form-hint">Set to 5000 for small caps, 50000 for mid+small</div>
+            <div class="form-hint">Small: 5,000 | Mid: 50,000 | All: 9,999,999</div>
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Sectors Allowlist</label>
-          <input type="text" name="sectors_allowlist" class="form-input" value="{{ rules.universe.sectors_allowlist | join(', ') }}" placeholder="Leave empty for all sectors">
-          <div class="form-hint">Comma-separated. E.g. "IT, Defense, Banking". Leave empty to include all.</div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Max Recommendations per Run</label>
-          <input type="number" name="max_recommendations_per_run" class="form-input" value="{{ rules.ui.max_recommendations_per_run }}" min="1" max="100">
-          <div class="form-hint">Show top N picks on the dashboard</div>
-        </div>
-      </div>
 
-      <!-- Filters Tab -->
-      <div id="tab-filters" class="rule-section">
+        <h3 style="margin: 20px 0 16px; font-size: 14px; color: var(--ink);">Quality Filters</h3>
         <div class="toggle-row">
           <div>
-            <div class="toggle-label">Exclude ESM Stocks</div>
-            <div class="toggle-desc">Remove stocks under Enhanced Surveillance Measure</div>
-          </div>
-          <label class="toggle">
-            <input type="checkbox" name="exclude_esm" {% if rules.filters.exclude_esm %}checked{% endif %}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <div class="toggle-label">Exclude Loss-Making Companies</div>
-            <div class="toggle-desc">Only include companies with positive TTM profit</div>
+            <div class="toggle-label">Profitable Companies Only</div>
+            <div class="toggle-desc">Exclude loss-making companies</div>
           </div>
           <label class="toggle">
             <input type="checkbox" name="exclude_loss_making" {% if rules.filters.exclude_loss_making %}checked{% endif %}>
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Exclude ESM Stocks</div>
+            <div class="toggle-desc">Remove stocks under surveillance</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" name="exclude_esm" {% if rules.filters.exclude_esm %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
         <div style="margin-top: 16px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Max PE Ratio</label>
+              <input type="number" name="max_pe" class="form-input" value="{{ rules.filters.max_pe }}" min="1" step="1">
+              <div class="form-hint">Value stocks: 25 | Growth: 60+</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Min Profit Growth YoY (%)</label>
+              <input type="number" name="min_profit_yoy_growth_pct" class="form-input" value="{{ rules.filters.min_profit_yoy_growth_pct }}" step="1">
+              <div class="form-hint">Minimum year-over-year profit growth</div>
+            </div>
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">Min TTM Profit (Cr)</label>
               <input type="number" name="min_profit_ttm_cr" class="form-input" value="{{ rules.filters.min_profit_ttm_cr }}" min="0" step="0.1">
             </div>
             <div class="form-group">
-              <label class="form-label">Min Profit YoY Growth (%)</label>
-              <input type="number" name="min_profit_yoy_growth_pct" class="form-input" value="{{ rules.filters.min_profit_yoy_growth_pct }}" min="0" step="1">
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Max PE Ratio</label>
-              <input type="number" name="max_pe" class="form-input" value="{{ rules.filters.max_pe }}" min="1" step="1">
-              <div class="form-hint">Higher values include growth stocks with rich valuations</div>
-            </div>
-            <div class="form-group">
               <label class="form-label">Max Promoter Pledge (%)</label>
               <input type="number" name="max_pledge_pct" class="form-input" value="{{ rules.filters.max_pledge_pct }}" min="0" max="100" step="1">
-              <div class="form-hint">Exclude stocks where promoters have pledged too many shares</div>
             </div>
           </div>
         </div>
+
+        <h3 style="margin: 20px 0 16px; font-size: 14px; color: var(--ink);">Sectors</h3>
+        <div class="form-group">
+          <input type="text" name="sectors_allowlist" class="form-input" value="{{ rules.universe.sectors_allowlist | join(', ') }}" placeholder="All sectors (leave empty)">
+          <div class="form-hint">Comma-separated to restrict. E.g. "Technology, Healthcare". Leave empty for all.</div>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label">Show Top N Results</label>
+          <input type="number" name="max_recommendations_per_run" class="form-input" value="{{ rules.ui.max_recommendations_per_run }}" min="5" max="100" style="max-width: 120px;">
+        </div>
       </div>
 
-      <!-- Scoring Weights Tab -->
-      <div id="tab-weights" class="rule-section">
-        <p class="meta" style="margin-bottom: 14px;">Drag the sliders to adjust how much each factor contributes to the final score. Weights should sum to 100.</p>
+      <!-- Tab 2: Scoring -->
+      <div id="tab-scoring" class="rule-section">
+        <h3 style="margin: 0 0 6px; font-size: 14px; color: var(--ink);">Score Weights</h3>
+        <p class="meta" style="margin-bottom: 14px;">How much each factor matters in the final score. Must add up to 100.</p>
 
         <div class="weight-row">
           <span class="weight-name" style="color:var(--green);">Profit Trend</span>
@@ -175,48 +139,85 @@
           <span>Total</span>
           <span class="sum" id="weight-sum">{{ rules.weights.profit_trend + rules.weights.valuation + rules.weights.future_events + rules.weights.quality + rules.weights.risk }}</span>
         </div>
-      </div>
 
-      <!-- Event Weights Tab -->
-      <div id="tab-events" class="rule-section">
-        <p class="meta" style="margin-bottom: 14px;">Set how much each type of corporate event boosts a stock's score.</p>
-
-        {% for key, val in rules.event_weights.items() %}
-        <div class="event-weight-row">
-          <span class="event-weight-name">{{ key | replace("_", " ") | title }}</span>
-          <input type="number" name="ew_{{ key }}" class="event-weight-input" value="{{ val }}" min="0" max="100">
+        <h3 style="margin: 24px 0 6px; font-size: 14px; color: var(--ink);">Event Boost Points</h3>
+        <p class="meta" style="margin-bottom: 14px;">How many points each type of corporate event adds to a stock's score.</p>
+        <div class="event-weights-grid">
+          {% for key, val in rules.event_weights.items() %}
+          <div class="event-weight-row">
+            <span class="event-weight-name">{{ key | replace("_", " ") | title }}</span>
+            <input type="number" name="ew_{{ key }}" class="event-weight-input" value="{{ val }}" min="0" max="100">
+          </div>
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
 
-      <!-- Schedule Tab -->
-      <div id="tab-schedule" class="rule-section">
+      <!-- Tab 3: Advanced -->
+      <div id="tab-advanced" class="rule-section">
+        <h3 style="margin: 0 0 16px; font-size: 14px; color: var(--ink);">Data Source</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Provider</label>
+            <select name="provider_type" class="form-select">
+              <option value="india_live" {% if rules.data_provider.type == "india_live" %}selected{% endif %}>India Live (Yahoo Finance)</option>
+              <option value="mock" {% if rules.data_provider.type == "mock" %}selected{% endif %}>Mock (Sample Data)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Symbols</label>
+            <input type="number" name="max_symbols" class="form-input" value="{{ rules.data_provider.max_symbols }}" min="0" max="1000">
+            <div class="form-hint">0 = scan all symbols</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Request Timeout (sec)</label>
+            <input type="number" name="requests_timeout_sec" class="form-input" value="{{ rules.data_provider.requests_timeout_sec }}" min="5" max="60">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Events Lookback (days)</label>
+            <input type="number" name="events_lookback_days" class="form-input" value="{{ rules.data_provider.events_lookback_days }}" min="7" max="365">
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">NSE Announcements</div>
+            <div class="toggle-desc">Fetch corporate announcements from NSE for event scoring</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" name="nse_events_enabled" {% if rules.data_provider.nse_events_enabled %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <h3 style="margin: 24px 0 16px; font-size: 14px; color: var(--ink);">Schedules</h3>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Full Scan (Cron)</label>
             <input type="text" name="full_scan_cron" class="form-input" value="{{ rules.schedules.full_scan_cron }}">
-            <div class="form-hint">Default: 30 16 * * 1-5 (4:30 PM IST, weekdays)</div>
+            <div class="form-hint">Default: 4:30 PM IST weekdays</div>
           </div>
           <div class="form-group">
             <label class="form-label">Event Scan (Cron)</label>
             <input type="text" name="event_scan_cron" class="form-input" value="{{ rules.schedules.event_scan_cron }}">
-            <div class="form-hint">Default: */30 9-15 * * 1-5 (every 30 min, market hours)</div>
+            <div class="form-hint">Default: every 30 min, market hours</div>
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Timezone</label>
-          <input type="text" name="timezone" class="form-input" value="{{ rules.schedules.timezone }}">
+          <input type="text" name="timezone" class="form-input" value="{{ rules.schedules.timezone }}" style="max-width: 200px;">
         </div>
+        <p class="meta" style="margin-top: 12px;">Prices auto-refresh every 15 minutes during market hours (9 AM - 3:30 PM IST).</p>
       </div>
 
       <div style="margin-top: 20px; display: flex; gap: 8px; border-top: 1px solid var(--border-light); padding-top: 20px;">
-        <button type="submit" class="btn btn-primary">Save Rules</button>
+        <button type="submit" class="btn btn-primary">Save Settings</button>
         <a class="btn btn-secondary" href="/">Back to Dashboard</a>
       </div>
     </form>
   </div>
 
-  <!-- Raw YAML Mode (hidden by default) -->
+  <!-- Raw YAML Mode -->
   <div id="yaml-mode" style="display: none;">
     <form method="post" action="/rules">
       <textarea name="yaml_text" class="yaml-editor">{{ yaml_text }}</textarea>
@@ -250,7 +251,6 @@ function updateWeights() {
   sumEl.className = 'sum ' + (total === 100 ? 'ok' : 'warn');
 }
 
-// Init weight colors on load
 document.addEventListener('DOMContentLoaded', updateWeights);
 </script>
 

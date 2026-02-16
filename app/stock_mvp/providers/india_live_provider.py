@@ -14,6 +14,7 @@ from app.stock_mvp.core import db
 from app.stock_mvp.core.settings import BASE_DIR
 from app.stock_mvp.models.schemas import StockEvent, StockSnapshot
 from app.stock_mvp.providers.base import DataProvider
+from app.stock_mvp.services import scan_status
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,8 @@ class IndiaLiveProvider(DataProvider):
         if not symbols:
             return []
 
+        scan_status.start_scan(len(symbols))
+
         # Phase 1: Check cache — identify which symbols need full fetch
         cached = db.get_cached_fundamentals(symbols, max_age_days=self.CACHE_MAX_AGE_DAYS)
         cached_symbols = set(cached.keys())
@@ -200,20 +203,37 @@ class IndiaLiveProvider(DataProvider):
             len(symbols),
         )
 
+        if stale_symbols:
+            scan_status.update_scan(
+                "fetching_fundamentals", 0,
+                message=f"Fetching fundamentals for {len(stale_symbols)} new stocks...",
+            )
+
         # Phase 2: Full fetch for stale/missing symbols (slow, per-symbol)
         new_cache_entries: list[dict[str, Any]] = []
-        for symbol in stale_symbols:
+        for i, symbol in enumerate(stale_symbols, 1):
+            scan_status.update_scan(
+                "fetching_fundamentals", i, symbol=symbol,
+                message=f"Fetching {symbol} ({i}/{len(stale_symbols)})",
+            )
             entry = self._fetch_fundamentals(symbol)
             if entry is not None:
                 cached[symbol] = entry
                 new_cache_entries.append(entry)
+            # Persist in batches of 20 to avoid losing progress on crash
+            if len(new_cache_entries) % 20 == 0 and new_cache_entries:
+                db.upsert_fundamentals_cache(new_cache_entries[-20:])
 
-        # Phase 3: Persist newly fetched fundamentals to cache
+        # Phase 3: Persist remaining newly fetched fundamentals to cache
         if new_cache_entries:
             db.upsert_fundamentals_cache(new_cache_entries)
             logger.info("Cached %d new/updated fundamentals", len(new_cache_entries))
 
         # Phase 4: Batch fetch live prices (single API call)
+        scan_status.update_scan(
+            "fetching_prices", len(stale_symbols),
+            message=f"Batch fetching live prices for {len(symbols)} symbols...",
+        )
         live_prices = self._batch_fetch_prices(symbols)
 
         # Phase 5: Merge cached fundamentals + live prices → StockSnapshots
