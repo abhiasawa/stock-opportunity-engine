@@ -1,116 +1,97 @@
-# Stock Opportunity Engine (MVP)
+# Stock Opportunity Engine
 
-Rule-driven stock opportunity scanner for Indian micro/small/mid-cap workflows.
+Rule-driven stock screener for the Indian stock market. Scans NSE/BSE stocks, scores them on profit trends, valuation, corporate events, and quality metrics, and presents ranked recommendations in a clean Screener.in-inspired web UI.
 
-## What this MVP does
-- Runs scheduled scans (daily + intraday event scan)
-- Applies editable rules from YAML
-- Ranks stocks with explainable scores
-- Stores run history and recommendation details
-- Provides web UI for:
-  - dashboard
-  - run history/details
-  - rules editing
-- Creates WhatsApp-style alert messages (stub log output)
-- Supports live India mode:
-  - Yahoo Finance snapshots (`yfinance`)
-  - NSE corporate announcements classification for event scoring
-- Supports real WhatsApp send via Twilio
+## Features
 
-## Tech stack
-- FastAPI
-- APScheduler
-- SQLite
-- Jinja templates
-- YAML config
+- **Live data** via Yahoo Finance (`yfinance`) for 429+ NSE stocks
+- **Fundamentals caching** — quarterly data cached for 90 days, only live prices fetched on repeat scans
+- **Batch price fetch** — single `yf.download()` call for all symbols
+- **NSE corporate announcements** — classifies events (orders, expansions, acquisitions) for event scoring
+- **Explainable scoring** — weighted breakdown: Profit Trend (35%), Valuation (20%), Events (25%), Quality (10%), Risk (10%)
+- **Expandable metrics** — click any stock row to see ROE, ROCE, Book Value, Debt, Sales, and more
+- **Screener.in links** — every stock symbol hyperlinks to its Screener.in page
+- **Visual rule editor** — 6-tab form UI for filters, weights, schedules (no YAML editing required)
+- **Scheduled scans** — configurable cron for daily full scans and intraday event scans
+- **Run history** — browse past scan results with full scoring details
 
-## Project layout
-- `app/stock_mvp/main.py` - FastAPI app entrypoint
-- `app/stock_mvp/services/` - pipeline, scoring, scheduler, notification
-- `app/stock_mvp/providers/` - data provider interfaces and mock provider
-- `app/stock_mvp/providers/india_live_provider.py` - live India provider
-- `app/stock_mvp/templates/` - UI templates
-- `config/rules.yaml` - editable rules and schedule
-- `data/sample_*.csv` - mock stock/event data
-- `data/stock_mvp.db` - SQLite DB (auto-created)
-- `docs/TECHNICAL_SPEC.md` - architecture and design decisions
+## Tech Stack
 
-## Quick start
-1. Create env and install dependencies:
+- **Backend**: FastAPI, SQLite, APScheduler
+- **Data**: yfinance, NSE Announcements API
+- **Frontend**: Jinja2 templates, vanilla CSS (Screener.in-inspired light theme)
+- **Config**: YAML-based rules (`config/rules.yaml`)
+
+## Project Layout
+
+```
+app/stock_mvp/
+  main.py                  # FastAPI app + routes
+  services/
+    pipeline.py            # Scan orchestration
+    scoring.py             # 5-factor scoring engine
+    scheduler.py           # APScheduler cron jobs
+  providers/
+    india_live_provider.py # Yahoo Finance + NSE events + caching
+    mock_provider.py       # CSV-based mock provider for testing
+  core/
+    db.py                  # SQLite (runs, recommendations, cache)
+    rules.py               # YAML rule loading/validation
+    settings.py            # Path constants
+  templates/               # Jinja2 HTML templates
+  static/style.css         # Screener-inspired light theme
+config/rules.yaml          # Editable rules, weights, schedules
+data/universe_symbols.csv  # 429 NSE stock symbols
+```
+
+## Quick Start
+
 ```bash
+# 1. Create virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
+
+# 3. Run the app
+uvicorn app.stock_mvp.main:app --reload --port 8000
+
+# 4. Open in browser
+open http://127.0.0.1:8000
 ```
 
-2. Run app:
-```bash
-uvicorn app.stock_mvp.main:app --reload
-```
+## Usage
 
-3. Open:
-- `http://127.0.0.1:8000/` dashboard
-- `http://127.0.0.1:8000/rules` rule editor
+1. Open the **Dashboard** at `http://127.0.0.1:8000`
+2. Click **Run Scan** to trigger a stock scan
+3. View ranked recommendations with score breakdowns
+4. Click any stock row to expand detailed financial metrics
+5. Click the stock symbol to open its Screener.in page
+6. Go to **Rules** to adjust filters, weights, and schedules via the visual editor
 
-## How to use
-1. Go to `/rules` and tune filters/weights/schedules.
-2. Click **Run Scan Now** on dashboard.
-3. Open latest run and inspect per-stock score details.
+## Configuration
 
-## Frequency
-Configured in `config/rules.yaml`:
-- `schedules.full_scan_cron`
-- `schedules.event_scan_cron`
-- `schedules.timezone`
+All settings are in `config/rules.yaml`:
 
-## Data
-MVP uses CSV mock data:
-- `data/sample_stocks.csv`
-- `data/sample_events.csv`
+| Section | Key Settings |
+|---------|-------------|
+| `data_provider` | Provider type, symbol file, timeout, events lookback |
+| `universe` | Market cap range, exchange filter, sector allowlist |
+| `filters` | Min profit, max PE, exclude ESM/loss-making stocks |
+| `weights` | Scoring weights for each factor (must sum to 100) |
+| `event_weights` | Points per event type (orders, expansions, etc.) |
+| `schedules` | Cron expressions for full scan and event scan |
+| `ui` | Max recommendations per run |
 
-Replace provider layer later with live APIs.
+## How Caching Works
 
-### Switch to live India mode
-Update `/Users/abhishekasawa/Downloads/Claude/Stocks/config/rules.yaml`:
-- `data_provider.type: india_live`
-- `data_provider.symbols_file: data/universe_symbols.csv`
-
-Edit `/Users/abhishekasawa/Downloads/Claude/Stocks/data/universe_symbols.csv` with NSE symbols.
-
-## WhatsApp
-Stub mode logs messages to:
-- `data/outbox/whatsapp.log`
-
-### Enable real WhatsApp via Twilio
-1. Set rules:
-- `notifications.mode: twilio`
-- `notifications.whatsapp_enabled: true`
-- `notifications.whatsapp_to: [+91...]`
-2. Export environment variables:
-```bash
-export TWILIO_ACCOUNT_SID=...
-export TWILIO_AUTH_TOKEN=...
-export TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-```
-You can copy `/Users/abhishekasawa/Downloads/Claude/Stocks/.env.example` into your shell/env manager.
-
-3. Send test message:
-```bash
-curl -X POST http://127.0.0.1:8000/api/notifications/test
-```
-
-### Fast setup helper
-```bash
-./scripts/setup_whatsapp_twilio.sh <SID> <TOKEN> <FROM_WHATSAPP> <TO_NUMBER>
-```
-
-### Important behavior
-- If WhatsApp is enabled in `twilio` mode and credentials are missing, runs now fail fast with a clear error (no silent fallback).
-- Check status via:
-```bash
-curl http://127.0.0.1:8000/api/notifications/status
-```
+- **First scan**: Fetches full fundamentals per-symbol via `yf.Ticker().info` (slow, ~1-2s per stock)
+- **Subsequent scans**: Reads fundamentals from SQLite cache, only fetches live prices via batch `yf.download()` (fast, single API call for all symbols)
+- **Cache expiry**: 90 days — quarterly data is re-fetched automatically when stale
 
 ## Notes
-- This is recommendation support, not auto-trading.
-- Always manually review recommendations.
+
+- This is a recommendation/screening tool, not an auto-trading system
+- Always manually review recommendations before making investment decisions
+- Yahoo Finance rate limits may slow down the first scan; subsequent scans use cached data
