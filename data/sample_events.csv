@@ -1,0 +1,17 @@
+symbol,event_type,event_date,value_cr,headline
+CAPINFRA,large_order,2026-02-10,453,Won residential construction order
+CAPINFRA,large_order,2026-01-20,224,Secured new commercial contract
+CAPINFRA,preferential_allotment,2026-01-30,96,Raised funds via preferential allotment
+CAPINFRA,capacity_expansion,2026-01-12,0,Expanded execution teams in 3 cities
+PRIMEXP,large_order,2026-02-11,552,Defense ministry order
+PRIMEXP,large_order,2026-01-28,86,Additional explosives contract
+PRIMEXP,partnership,2026-01-09,0,Strategic tie-up with manufacturing partner
+HARIOMP,capacity_expansion,2026-02-01,0,Commissioned new pipe mill
+HARIOMP,preferential_allotment,2026-01-17,160,Raised growth capital
+RESGEN,new_plant,2026-01-22,0,Started trial production at new recycling plant
+RESGEN,partnership,2026-02-02,0,Signed feedstock supply partnership
+MIDTECH,subsidiary_launch,2026-01-15,0,Launched subsidiary in APAC region
+MIDTECH,acquisition,2026-01-29,45,Acquired niche software services firm
+KOTAR,large_order,2026-02-05,194,Received biodiesel order
+KOTAR,large_order,2026-01-26,73,Secured second biodiesel order
+ESMCO,large_order,2026-01-16,25,Order won but stock under ESM framework

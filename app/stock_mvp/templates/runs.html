@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <h2>Scan History</h2>
+  </div>
+  {% if runs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Started</th>
+          <th>Completed</th>
+          <th class="text-right">Scanned</th>
+          <th class="text-right">Picks</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr>
+          <td><strong>#{{ run.id }}</strong></td>
+          <td><span class="tag">{{ run.run_type }}</span></td>
+          <td>
+            {% if run.status == "completed" %}
+            <span class="badge badge-success"><span class="badge-dot"></span> Completed</span>
+            {% elif run.status == "failed" %}
+            <span class="badge badge-danger"><span class="badge-dot"></span> Failed</span>
+            {% else %}
+            <span class="badge badge-warning"><span class="badge-dot"></span> Running</span>
+            {% endif %}
+          </td>
+          <td class="meta">{{ run.started_at[:19] }}</td>
+          <td class="meta">{{ run.completed_at[:19] if run.completed_at else "--" }}</td>
+          <td class="td-num">{{ run.summary.universe_size if run.summary else "--" }}</td>
+          <td class="td-num">
+            {% if run.summary and run.summary.recommended_count > 0 %}
+            <strong class="text-green">{{ run.summary.recommended_count }}</strong>
+            {% else %}
+            <span class="meta">{{ run.summary.recommended_count if run.summary else "--" }}</span>
+            {% endif %}
+          </td>
+          <td><a class="btn btn-secondary btn-sm" href="/runs/{{ run.id }}">Detail</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Runs Yet</h3>
+    <p>Scan history will appear here after your first scan.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

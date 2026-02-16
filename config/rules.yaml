@@ -1,0 +1,56 @@
+version: 1
+
+data_provider:
+  type: india_live # mock | india_live
+  symbols_file: data/universe_symbols.csv
+  max_symbols: 0  # 0 = scan all symbols in the CSV
+  requests_timeout_sec: 15
+  events_lookback_days: 90
+  nse_events_enabled: true
+
+universe:
+  min_market_cap_cr: 50
+  max_market_cap_cr: 9999999  # No upper cap restriction
+  exchanges:
+    - NSE
+    - BSE
+  sectors_allowlist: []
+
+filters:
+  exclude_esm: true
+  exclude_loss_making: true
+  min_profit_ttm_cr: 1
+  min_profit_yoy_growth_pct: 5
+  max_pe: 60
+  max_pledge_pct: 40
+
+weights:
+  profit_trend: 35
+  valuation: 20
+  future_events: 25
+  quality: 10
+  risk: 10
+
+event_weights:
+  large_order: 14
+  capacity_expansion: 12
+  new_plant: 10
+  preferential_allotment: 10
+  partnership: 8
+  acquisition: 8
+  subsidiary_launch: 7
+
+score_caps:
+  profit_trend_max: 100
+  valuation_max: 100
+  future_events_max: 100
+  quality_max: 100
+  risk_max: 100
+
+schedules:
+  full_scan_cron: "30 16 * * 1-5"
+  event_scan_cron: "*/30 9-15 * * 1-5"
+  timezone: "Asia/Kolkata"
+
+ui:
+  max_recommendations_per_run: 25

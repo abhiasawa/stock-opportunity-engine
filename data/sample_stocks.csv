@@ -1,0 +1,10 @@
+symbol,name,exchange,sector,market_cap_cr,pe,profit_ttm_cr,profit_prev_ttm_cr,profit_q1_cr,profit_q2_cr,profit_q3_cr,profit_q4_cr,promoter_holding_pct,pledge_pct,hni_net_buying_cr,esm_flag,governance_flag
+CAPINFRA,Capacity Infra Projects,NSE,Infrastructure,1500,17,92,52,16,21,24,31,52,0,18,false,false
+HARIOMP,HarIOM Pipe Industries,NSE,Metals,4200,37,110,73,22,24,28,36,56,0,10,false,false
+RESGEN,ResGen Renewable,BSE,Clean Energy,125,30,9.8,3.2,1.9,2.1,2.5,3.3,62,0,4,false,false
+PRIMEXP,Premier Explosives,NSE,Defense,3200,34,145,92,28,33,37,47,42,0,12,false,false
+KOTAR, Kotyar Renewables,NSE,Biofuel,950,21,48,35,10,11,12,15,59,1,5,false,false
+LOWQUAL,Low Quality Example,BSE,Industrials,400,65,12,14,2,3,2,5,28,45,-2,false,true
+ESMCO,ESM Trapped Co,BSE,Industrials,300,12,20,12,4,5,5,6,50,0,1,true,false
+LOSSCO,Loss Maker Ltd,NSE,Tech,700,90,-8,-3,-1,-2,-2,-3,44,0,0,false,false
+MIDTECH,Midcap Tech Dynamics,NSE,Technology,4800,27,210,140,45,50,53,62,48,0,20,false,false

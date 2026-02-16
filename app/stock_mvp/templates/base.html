@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ title or "Screener - Stock Opportunity Engine" }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F4C8;</text></svg>">
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar-inner">
+        <a href="/" class="topbar-brand">Stock Screener</a>
+        <nav class="topbar-nav">
+          <a href="/" {% if active_page == "dashboard" %}class="active"{% endif %}>Dashboard</a>
+          <a href="/runs" {% if active_page == "runs" %}class="active"{% endif %}>History</a>
+          <a href="/rules" {% if active_page == "rules" %}class="active"{% endif %}>Rules</a>
+        </nav>
+        <div class="topbar-actions">
+          <form method="post" action="/runs/trigger" style="margin:0;">
+            <button type="submit" class="btn btn-primary btn-sm">Run Scan</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      {% block content %}{% endblock %}
+    </div>
+  </body>
+</html>

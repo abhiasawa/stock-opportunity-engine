@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if saved %}
+<div class="alert alert-success">Rules saved and scheduler reloaded successfully.</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-header">
+    <h2>Rule Configuration</h2>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('yaml-mode').style.display = document.getElementById('yaml-mode').style.display === 'none' ? 'block' : 'none'; document.getElementById('visual-mode').style.display = document.getElementById('visual-mode').style.display === 'none' ? 'block' : 'none'; this.textContent = this.textContent === 'Raw YAML' ? 'Visual Editor' : 'Raw YAML';">Raw YAML</button>
+    </div>
+  </div>
+
+  <!-- Visual Editor Mode -->
+  <div id="visual-mode">
+    <div class="rule-tabs">
+      <button type="button" class="rule-tab active" onclick="switchTab(this, 'tab-provider')">Data Source</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-universe')">Universe</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-filters')">Filters</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-weights')">Scoring Weights</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-events')">Event Weights</button>
+      <button type="button" class="rule-tab" onclick="switchTab(this, 'tab-schedule')">Schedule</button>
+    </div>
+
+    <form method="post" action="/rules/visual" id="visual-form">
+
+      <!-- Data Source Tab -->
+      <div id="tab-provider" class="rule-section active">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Data Provider</label>
+            <select name="provider_type" class="form-select">
+              <option value="mock" {% if rules.data_provider.type == "mock" %}selected{% endif %}>Mock (Sample Data)</option>
+              <option value="india_live" {% if rules.data_provider.type == "india_live" %}selected{% endif %}>India Live (Yahoo Finance)</option>
+            </select>
+            <div class="form-hint">Use "Mock" for testing, "India Live" for real market data</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Symbols to Scan</label>
+            <input type="number" name="max_symbols" class="form-input" value="{{ rules.data_provider.max_symbols }}" min="1" max="1000">
+            <div class="form-hint">Limit how many stocks are fetched per scan</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Request Timeout (sec)</label>
+            <input type="number" name="requests_timeout_sec" class="form-input" value="{{ rules.data_provider.requests_timeout_sec }}" min="5" max="60">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Events Lookback (days)</label>
+            <input type="number" name="events_lookback_days" class="form-input" value="{{ rules.data_provider.events_lookback_days }}" min="7" max="365">
+          </div>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">NSE Events Enabled</div>
+            <div class="toggle-desc">Fetch corporate announcements from NSE</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" name="nse_events_enabled" {% if rules.data_provider.nse_events_enabled %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Universe Tab -->
+      <div id="tab-universe" class="rule-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Min Market Cap (Cr)</label>
+            <input type="number" name="min_market_cap_cr" class="form-input" value="{{ rules.universe.min_market_cap_cr }}" min="0">
+            <div class="form-hint">Exclude stocks below this market cap</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Market Cap (Cr)</label>
+            <input type="number" name="max_market_cap_cr" class="form-input" value="{{ rules.universe.max_market_cap_cr }}" min="0">
+            <div class="form-hint">Set to 5000 for small caps, 50000 for mid+small</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sectors Allowlist</label>
+          <input type="text" name="sectors_allowlist" class="form-input" value="{{ rules.universe.sectors_allowlist | join(', ') }}" placeholder="Leave empty for all sectors">
+          <div class="form-hint">Comma-separated. E.g. "IT, Defense, Banking". Leave empty to include all.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Recommendations per Run</label>
+          <input type="number" name="max_recommendations_per_run" class="form-input" value="{{ rules.ui.max_recommendations_per_run }}" min="1" max="100">
+          <div class="form-hint">Show top N picks on the dashboard</div>
+        </div>
+      </div>
+
+      <!-- Filters Tab -->
+      <div id="tab-filters" class="rule-section">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Exclude ESM Stocks</div>
+            <div class="toggle-desc">Remove stocks under Enhanced Surveillance Measure</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" name="exclude_esm" {% if rules.filters.exclude_esm %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">Exclude Loss-Making Companies</div>
+            <div class="toggle-desc">Only include companies with positive TTM profit</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" name="exclude_loss_making" {% if rules.filters.exclude_loss_making %}checked{% endif %}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div style="margin-top: 16px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Min TTM Profit (Cr)</label>
+              <input type="number" name="min_profit_ttm_cr" class="form-input" value="{{ rules.filters.min_profit_ttm_cr }}" min="0" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Min Profit YoY Growth (%)</label>
+              <input type="number" name="min_profit_yoy_growth_pct" class="form-input" value="{{ rules.filters.min_profit_yoy_growth_pct }}" min="0" step="1">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Max PE Ratio</label>
+              <input type="number" name="max_pe" class="form-input" value="{{ rules.filters.max_pe }}" min="1" step="1">
+              <div class="form-hint">Higher values include growth stocks with rich valuations</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Promoter Pledge (%)</label>
+              <input type="number" name="max_pledge_pct" class="form-input" value="{{ rules.filters.max_pledge_pct }}" min="0" max="100" step="1">
+              <div class="form-hint">Exclude stocks where promoters have pledged too many shares</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scoring Weights Tab -->
+      <div id="tab-weights" class="rule-section">
+        <p class="meta" style="margin-bottom: 14px;">Drag the sliders to adjust how much each factor contributes to the final score. Weights should sum to 100.</p>
+
+        <div class="weight-row">
+          <span class="weight-name" style="color:var(--green);">Profit Trend</span>
+          <input type="range" name="w_profit_trend" class="weight-slider" min="0" max="100" value="{{ rules.weights.profit_trend }}" oninput="updateWeights()">
+          <span class="weight-val" id="wv-profit">{{ rules.weights.profit_trend }}</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-name" style="color:var(--teal);">Valuation</span>
+          <input type="range" name="w_valuation" class="weight-slider" min="0" max="100" value="{{ rules.weights.valuation }}" oninput="updateWeights()">
+          <span class="weight-val" id="wv-valuation">{{ rules.weights.valuation }}</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-name" style="color:var(--amber);">Future Events</span>
+          <input type="range" name="w_future_events" class="weight-slider" min="0" max="100" value="{{ rules.weights.future_events }}" oninput="updateWeights()">
+          <span class="weight-val" id="wv-events">{{ rules.weights.future_events }}</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-name" style="color:var(--purple);">Quality</span>
+          <input type="range" name="w_quality" class="weight-slider" min="0" max="100" value="{{ rules.weights.quality }}" oninput="updateWeights()">
+          <span class="weight-val" id="wv-quality">{{ rules.weights.quality }}</span>
+        </div>
+        <div class="weight-row">
+          <span class="weight-name" style="color:var(--red);">Risk Penalty</span>
+          <input type="range" name="w_risk" class="weight-slider" min="0" max="100" value="{{ rules.weights.risk }}" oninput="updateWeights()">
+          <span class="weight-val" id="wv-risk">{{ rules.weights.risk }}</span>
+        </div>
+        <div class="weight-total">
+          <span>Total</span>
+          <span class="sum" id="weight-sum">{{ rules.weights.profit_trend + rules.weights.valuation + rules.weights.future_events + rules.weights.quality + rules.weights.risk }}</span>
+        </div>
+      </div>
+
+      <!-- Event Weights Tab -->
+      <div id="tab-events" class="rule-section">
+        <p class="meta" style="margin-bottom: 14px;">Set how much each type of corporate event boosts a stock's score.</p>
+
+        {% for key, val in rules.event_weights.items() %}
+        <div class="event-weight-row">
+          <span class="event-weight-name">{{ key | replace("_", " ") | title }}</span>
+          <input type="number" name="ew_{{ key }}" class="event-weight-input" value="{{ val }}" min="0" max="100">
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Schedule Tab -->
+      <div id="tab-schedule" class="rule-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Full Scan (Cron)</label>
+            <input type="text" name="full_scan_cron" class="form-input" value="{{ rules.schedules.full_scan_cron }}">
+            <div class="form-hint">Default: 30 16 * * 1-5 (4:30 PM IST, weekdays)</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Event Scan (Cron)</label>
+            <input type="text" name="event_scan_cron" class="form-input" value="{{ rules.schedules.event_scan_cron }}">
+            <div class="form-hint">Default: */30 9-15 * * 1-5 (every 30 min, market hours)</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Timezone</label>
+          <input type="text" name="timezone" class="form-input" value="{{ rules.schedules.timezone }}">
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; display: flex; gap: 8px; border-top: 1px solid var(--border-light); padding-top: 20px;">
+        <button type="submit" class="btn btn-primary">Save Rules</button>
+        <a class="btn btn-secondary" href="/">Back to Dashboard</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Raw YAML Mode (hidden by default) -->
+  <div id="yaml-mode" style="display: none;">
+    <form method="post" action="/rules">
+      <textarea name="yaml_text" class="yaml-editor">{{ yaml_text }}</textarea>
+      <div style="margin-top: 14px; display: flex; gap: 8px;">
+        <button type="submit" class="btn btn-primary">Save Rules</button>
+        <a class="btn btn-secondary" href="/">Back to Dashboard</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function switchTab(btn, tabId) {
+  document.querySelectorAll('.rule-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.rule-section').forEach(s => s.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+function updateWeights() {
+  const sliders = document.querySelectorAll('.weight-slider');
+  const ids = ['wv-profit', 'wv-valuation', 'wv-events', 'wv-quality', 'wv-risk'];
+  let total = 0;
+  sliders.forEach((s, i) => {
+    const v = parseInt(s.value);
+    document.getElementById(ids[i]).textContent = v;
+    total += v;
+  });
+  const sumEl = document.getElementById('weight-sum');
+  sumEl.textContent = total;
+  sumEl.className = 'sum ' + (total === 100 ? 'ok' : 'warn');
+}
+
+// Init weight colors on load
+document.addEventListener('DOMContentLoaded', updateWeights);
+</script>
+
+{% endblock %}

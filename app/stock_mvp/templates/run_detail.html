@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h2>Run #{{ run.id }}</h2>
+      <div class="meta" style="margin-top: 4px;">
+        {{ run.run_type }} &middot;
+        {% if run.status == "completed" %}
+        <span class="badge badge-success"><span class="badge-dot"></span> Completed</span>
+        {% elif run.status == "failed" %}
+        <span class="badge badge-danger"><span class="badge-dot"></span> Failed</span>
+        {% else %}
+        <span class="badge badge-warning"><span class="badge-dot"></span> Running</span>
+        {% endif %}
+        &middot; {{ run.started_at[:19] }}
+      </div>
+    </div>
+    <a class="btn btn-secondary btn-sm" href="/runs">Back to History</a>
+  </div>
+
+  {% if run.error_text %}
+  <div class="alert alert-error">{{ run.error_text }}</div>
+  {% endif %}
+
+  {% if run.summary %}
+  <div class="kpi-row" style="margin-top: 4px;">
+    <div class="kpi-item">
+      <div class="kpi-label">Universe</div>
+      <div class="kpi-value">{{ run.summary.universe_size }}</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-label">Eligible</div>
+      <div class="kpi-value">{{ run.summary.eligible_universe }}</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-label">Passed</div>
+      <div class="kpi-value">{{ run.summary.passed_filters }}</div>
+    </div>
+    <div class="kpi-item">
+      <div class="kpi-label">Picks</div>
+      <div class="kpi-value green">{{ run.summary.recommended_count }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% if recommendations %}
+<div class="card">
+  <h2>Recommendations &middot; Detailed Scoring</h2>
+  <div class="table-wrap" style="margin-top: 12px;">
+    <table>
+      <thead>
+        <tr>
+          <th class="text-center">#</th>
+          <th>Stock</th>
+          <th class="text-right">Final Score</th>
+          <th class="text-right text-green">Profit</th>
+          <th class="text-right text-teal">Valuation</th>
+          <th class="text-right text-amber">Events</th>
+          <th class="text-right text-purple">Quality</th>
+          <th class="text-right text-red">Risk</th>
+          <th>Reasons</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in recommendations %}
+        <tr class="rec-row" onclick="toggleMetrics({{ loop.index }})" style="cursor:pointer;">
+          <td class="text-center">
+            {% if r.rank <= 3 %}
+            <span class="rank rank-{{ r.rank }}">{{ r.rank }}</span>
+            {% else %}
+            <span class="rank rank-default">{{ r.rank }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="https://www.screener.in/company/{{ r.symbol | screener_encode }}/" target="_blank" class="td-symbol" onclick="event.stopPropagation();">{{ r.symbol }}</a>
+            <div class="td-name">{{ r.name }} &middot; {{ r.sector }}</div>
+            <div class="meta">PE: {{ "%.1f"|format(r.pe) }} &middot; MCap: {{ "%.0f"|format(r.market_cap_cr) }} Cr</div>
+          </td>
+          <td class="text-right">
+            {% set sc = "high" if r.final_score >= 65 else ("mid" if r.final_score >= 40 else "low") %}
+            <span class="score-pill {{ sc }}">{{ "%.1f"|format(r.final_score) }}</span>
+          </td>
+          <td class="td-num fw-600 text-green">{{ "%.1f"|format(r.score_breakdown.profit_trend) }}</td>
+          <td class="td-num fw-600 text-teal">{{ "%.1f"|format(r.score_breakdown.valuation) }}</td>
+          <td class="td-num fw-600 text-amber">{{ "%.1f"|format(r.score_breakdown.future_events) }}</td>
+          <td class="td-num fw-600 text-purple">{{ "%.1f"|format(r.score_breakdown.quality) }}</td>
+          <td class="td-num fw-600 text-red">{{ "%.1f"|format(r.score_breakdown.risk_penalty) }}</td>
+          <td>
+            {% for reason in r.reasons %}
+            <span class="tag">{{ reason }}</span>
+            {% endfor %}
+          </td>
+          <td class="text-center">
+            <span class="expand-icon" id="expand-icon-{{ loop.index }}">&#9662;</span>
+          </td>
+        </tr>
+        <!-- Expandable Metrics Row -->
+        <tr class="metrics-row" id="metrics-{{ loop.index }}" style="display:none;">
+          <td colspan="10" style="padding: 0;">
+            {% set m = r.metrics or {} %}
+            <div class="metrics-panel">
+              <div class="metrics-grid">
+                <div class="metric-item"><div class="metric-label">Current Price</div><div class="metric-value">{{ "%.2f"|format(m.get("current_price", 0)) if m.get("current_price") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Book Value</div><div class="metric-value">{{ "%.2f"|format(m.get("book_value", 0)) if m.get("book_value") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Price / Book</div><div class="metric-value">{{ "%.2f"|format(m.get("price_to_book", 0)) if m.get("price_to_book") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Dividend Yield</div><div class="metric-value">{{ "%.2f"|format(m.get("dividend_yield", 0)) }}%</div></div>
+                <div class="metric-item"><div class="metric-label">ROE</div><div class="metric-value {% if m.get('roe', 0) >= 15 %}text-green{% elif m.get('roe', 0) >= 10 %}text-amber{% else %}text-red{% endif %}">{{ "%.2f"|format(m.get("roe", 0)) }}%</div></div>
+                <div class="metric-item"><div class="metric-label">ROCE</div><div class="metric-value {% if m.get('roce', 0) >= 15 %}text-green{% elif m.get('roce', 0) >= 10 %}text-amber{% else %}text-red{% endif %}">{{ "%.2f"|format(m.get("roce", 0)) }}%</div></div>
+                <div class="metric-item"><div class="metric-label">Sales (Cr)</div><div class="metric-value">{{ "%.0f"|format(m.get("sales_cr", 0)) if m.get("sales_cr") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Op. Profit (Cr)</div><div class="metric-value">{{ "%.0f"|format(m.get("operating_profit_cr", 0)) if m.get("operating_profit_cr") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Net Worth (Cr)</div><div class="metric-value">{{ "%.0f"|format(m.get("net_worth_cr", 0)) if m.get("net_worth_cr") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Debt (Cr)</div><div class="metric-value">{{ "%.0f"|format(m.get("debt_cr", 0)) if m.get("debt_cr") else "--" }}</div></div>
+                <div class="metric-item"><div class="metric-label">Promoter Hold.</div><div class="metric-value">{{ "%.1f"|format(m.get("promoter_holding_pct", 0)) }}%</div></div>
+                <div class="metric-item"><div class="metric-label">52W High / Low</div><div class="metric-value">{{ "%.0f"|format(m.get("high_52w", 0)) }} / {{ "%.0f"|format(m.get("low_52w", 0)) }}</div></div>
+              </div>
+              <div style="margin-top: 8px;">
+                <a href="https://www.screener.in/company/{{ r.symbol | screener_encode }}/" target="_blank" class="btn btn-secondary btn-sm">View on Screener &rarr;</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <h3>No Recommendations</h3>
+    <p>This run did not produce any recommendations. Try adjusting your filters in the Rules editor.</p>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function toggleMetrics(idx) {
+  var row = document.getElementById('metrics-' + idx);
+  var icon = document.getElementById('expand-icon-' + idx);
+  if (row.style.display === 'none') {
+    row.style.display = '';
+    icon.innerHTML = '&#9652;';
+  } else {
+    row.style.display = 'none';
+    icon.innerHTML = '&#9662;';
+  }
+}
+</script>
+{% endblock %}
